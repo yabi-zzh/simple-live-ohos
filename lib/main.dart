@@ -98,15 +98,30 @@ Future<void> initServices() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  ThemeMode _getSavedThemeMode() {
+  // 预计算主题，避免每次 build() 重复生成 ColorScheme
+  static final _lightTheme = ThemeData(
+    colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+    useMaterial3: true,
+  );
+  static final _darkTheme = ThemeData(
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: Colors.blue,
+      brightness: Brightness.dark,
+    ),
+    useMaterial3: true,
+  );
+
+  /// 主题响应式状态，通过 builder 注入非动画 Theme 实现一帧切换，
+  /// 绕过 MaterialApp 内置 AnimatedTheme 的多帧连续重建
+  static final isDark = _readDarkMode().obs;
+
+  static bool _readDarkMode() {
     try {
       final saved = StorageService.instance.getValue<String?>('theme_mode', null);
-      if (saved == 'dark') return ThemeMode.dark;
-      if (saved == 'light') return ThemeMode.light;
-    } catch (e) {
-      // StorageService 可能未初始化
-    }
-    return ThemeMode.system;
+      if (saved == 'dark') return true;
+      if (saved == 'light') return false;
+    } catch (_) {}
+    return PlatformDispatcher.instance.platformBrightness == Brightness.dark;
   }
 
   @override
@@ -114,18 +129,15 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
       title: 'Simple Live',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
-      themeMode: _getSavedThemeMode(),
+      theme: _lightTheme,
+      darkTheme: _darkTheme,
+      themeMode: isDark.value ? ThemeMode.dark : ThemeMode.light,
+      builder: (context, child) {
+        return Obx(() => Theme(
+          data: isDark.value ? _darkTheme : _lightTheme,
+          child: child!,
+        ));
+      },
       initialRoute: AppRoutes.index,
       getPages: AppPages.pages,
     );

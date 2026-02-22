@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../main.dart';
+import '../../constants/app_constants.dart';
 import '../../services/favorite_service.dart';
 import '../../services/history_service.dart';
 import '../../services/danmaku_settings_service.dart';
@@ -233,14 +235,13 @@ class MinePage extends StatelessWidget {
   }
 
   Widget _buildThemeSwitch(BuildContext context) {
-    return Switch(
-      value: Theme.of(context).brightness == Brightness.dark,
+    return Obx(() => Switch(
+      value: MyApp.isDark.value,
       onChanged: (dark) {
-        final mode = dark ? ThemeMode.dark : ThemeMode.light;
-        Get.changeThemeMode(mode);
+        MyApp.isDark.value = dark;
         StorageService.instance.setValue('theme_mode', dark ? 'dark' : 'light');
       },
-    );
+    ));
   }
 
   void _showDanmakuSettings(BuildContext context) {
@@ -533,7 +534,7 @@ class MinePage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('版本: 1.0.0'),
+            Text('版本: ${AppConstants.version}'),
             SizedBox(height: 8),
             Text('多平台直播聚合应用'),
             SizedBox(height: 4),
