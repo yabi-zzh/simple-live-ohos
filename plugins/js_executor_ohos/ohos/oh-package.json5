@@ -1,0 +1,11 @@
+{
+  "name": "js_executor_ohos",
+  "version": "1.0.0",
+  "description": "JavaScript executor plugin for HarmonyOS using WebView.",
+  "main": "index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@ohos/flutter_ohos": "file:./har/flutter.har"
+  }
+}

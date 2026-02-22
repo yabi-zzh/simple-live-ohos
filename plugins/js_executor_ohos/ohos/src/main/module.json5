@@ -1,0 +1,10 @@
+{
+  "module": {
+    "name": "js_executor_ohos",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet"
+    ]
+  }
+}
