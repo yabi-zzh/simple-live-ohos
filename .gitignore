@@ -1,0 +1,65 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+
+# HarmonyOS related
+ohos/.hvigor/
+ohos/.idea/
+ohos/build/
+ohos/entry/build/
+ohos/entry/.preview/
+ohos/entry/src/ohosTest/
+ohos/local.properties
+ohos/.cxx/
+**/oh_modules/
+**/node_modules/
+
+# 本地依赖的构建产物（保留源码）
+media-kit/.git
+media-kit/**/build/
+simple_live_core/.git
+plugins/**/build/
+
+# Flutter 编译产物
+ohos/entry/src/main/resources/rawfile/flutter_assets/
+
+# media_kit HarmonyOS 模块构建输出
+media-kit/libs/ohos/media_kit_libs_ohos/ohos/
+
+# 依赖锁文件（各开发者本地生成）
+**/oh-package-lock.json5
+
+# 自动生成文件
+**/BuildProfile.ets
+
+# 临时文件和日志
+*.tmp
+*.temp
+docs/
+flutter_*.log
+

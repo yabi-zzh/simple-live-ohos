@@ -1,0 +1,18 @@
+
+{
+  "apiType": 'stageMode',
+  "buildOption": {
+  },
+  "targets": [
+    {
+      "name": "default",
+      "runtimeOS": "HarmonyOS",
+      "output": {
+        "artifactName": "simple-live-ohos"
+      }
+    },
+    {
+      "name": "ohosTest",
+    }
+  ]
+}

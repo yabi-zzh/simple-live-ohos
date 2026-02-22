@@ -1,0 +1,65 @@
+name: simple_live_app
+description: "Simple Live - 多平台直播聚合应用"
+publish_to: 'none'
+version: 1.0.0+1
+homepage: https://github.com/yabi-zzh/simple-live-ohos
+repository: https://github.com/yabi-zzh/simple-live-ohos
+
+environment:
+  sdk: ^3.6.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # ---- 核心库（本地 path 依赖） ----
+  simple_live_core:
+    path: ./simple_live_core
+
+  # ---- 纯 Dart 依赖 ----
+  get: ^4.7.3                    # 状态管理/路由
+  hive: 2.2.3                    # 本地存储
+  hive_flutter: 1.1.0            # Hive Flutter 适配
+  logger: ^2.6.2                 # 日志
+  uuid: ^4.5.2                   # UUID
+  collection: any
+
+  # ---- 弹幕渲染（纯 Dart，CustomPainter，本地 path） ----
+  canvas_danmaku:
+    path: ./plugins/canvas_danmaku
+
+  # ---- 播放器（media_kit OpenHarmony 适配，本地 path） ----
+  media_kit:
+    path: ./media-kit/media_kit
+  media_kit_video:
+    path: ./media-kit/media_kit_video
+  media_kit_libs_video:
+    path: ./media-kit/libs/universal/media_kit_libs_video
+
+  # ---- 屏幕常亮 ----
+  wakelock_plus_ohos:
+    path: ./plugins/wakelock_plus_ohos
+
+  # ---- JS 执行器（斗鱼/抖音签名） ----
+  js_executor_ohos:
+    path: ./plugins/js_executor_ohos
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  build_runner: ^2.3.3
+  hive_generator: ^2.0.0
+
+dependency_overrides:
+  media_kit_libs_ohos:
+    path: ./media-kit/libs/ohos/media_kit_libs_ohos
+  wakelock_plus_ohos:
+    path: ./plugins/wakelock_plus_ohos
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
