@@ -3,6 +3,15 @@ import 'package:dio/dio.dart';
 import 'core_log.dart';
 
 class CustomInterceptor extends Interceptor {
+  static const int _maxDataLength = 500;
+
+  static String _truncateData(dynamic data) {
+    if (data == null) return 'null';
+    final str = data.toString();
+    if (str.length <= _maxDataLength) return str;
+    return '${str.substring(0, _maxDataLength)}... (${str.length} chars, truncated)';
+  }
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     options.extra["ts"] = DateTime.now().millisecondsSinceEpoch;
@@ -36,7 +45,7 @@ Request Query：${err.requestOptions.queryParameters}
 Request Data：${err.requestOptions.data}
 Request Headers：${err.requestOptions.headers}
 Response Headers：${err.response?.headers.map}
-Response Data：${err.response?.data}''', err.stackTrace);
+Response Data：${_truncateData(err.response?.data)}''', err.stackTrace);
     } else {
       CoreLog.e(
         "[HTTP Error] [${err.type}] [Time:${time}ms]\n[${err.response?.statusCode}] ${err.requestOptions.uri}",
@@ -61,7 +70,7 @@ Request Query：${response.requestOptions.queryParameters}
 Request Data：${response.requestOptions.data}
 Request Headers：${response.requestOptions.headers}
 Response Headers：${response.headers.map}
-Response Data：${response.data}''',
+Response Data：${_truncateData(response.data)}''',
       );
     } else if (CoreLog.requestLogType == RequestLogType.short) {
       CoreLog.i(

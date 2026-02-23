@@ -40,14 +40,12 @@ class InitializerOhos {
     Future<void> Function(Pointer<generated.mpv_event>) callback, {
     Map<String, String> options = const {},
   }) async {
-    print('[InitializerOhos] create() 开始');
     Pointer<generated.mpv_handle> ctx;
     try {
       ctx = mpv.mpv_create();
-      print('[InitializerOhos] mpv_create() 完成, ctx=${ctx.address}');
     } catch (e, stack) {
       print('[InitializerOhos] mpv_create() 异常: $e');
-      print('[InitializerOhos] 堆栈: $stack');
+      print('[InitializerOhos] ���栈: $stack');
       rethrow;
     }
 
@@ -59,11 +57,9 @@ class InitializerOhos {
       calloc.free(name);
       calloc.free(value);
     }
-    print('[InitializerOhos] 选项设置完成');
 
     // Initialize mpv
     final initResult = mpv.mpv_initialize(ctx);
-    print('[InitializerOhos] mpv_initialize() 返回: $initResult');
     if (initResult < 0) {
       final error = mpv.mpv_error_string(initResult).cast<Utf8>().toDartString();
       print('[InitializerOhos] mpv_initialize 失败: $error');
@@ -75,13 +71,12 @@ class InitializerOhos {
     _eventCallbacks[ctx.address] = callback;
 
     // Start polling timer (poll every 16ms ≈ 60fps)
-    print('[InitializerOhos] 启动轮询 Timer');
     final timer = Timer.periodic(const Duration(milliseconds: 16), (_) {
       _pollEvents(ctx);
     });
     _timers[ctx.address] = timer;
 
-    print('[InitializerOhos] create() 完成');
+    print('[InitializerOhos] mpv 初始化完成, ctx=${ctx.address}');
     return ctx;
   }
 
@@ -97,10 +92,6 @@ class InitializerOhos {
 
   /// Polls for events from mpv.
   void _pollEvents(Pointer<generated.mpv_handle> ctx) {
-    if (!_loggedPoll) {
-      print('[InitializerOhos] _pollEvents 首次调用, ctx=${ctx.address}');
-      _loggedPoll = true;
-    }
     _locks[ctx.address]?.synchronized(() async {
       while (true) {
         // Poll with 0 timeout (non-blocking)
@@ -108,19 +99,11 @@ class InitializerOhos {
         if (event == nullptr) return;
         if (event.ref.event_id == generated.mpv_event_id.MPV_EVENT_NONE) return;
 
-        _pollCount++;
-        if (_pollCount <= 20) {
-          print('[InitializerOhos] 收到事件: ${event.ref.event_id}');
-        }
-
         // Process event
         await _eventCallbacks[ctx.address]?.call(event);
       }
     });
   }
-
-  bool _loggedPoll = false;
-  int _pollCount = 0;
 
   final _locks = HashMap<int, Lock>();
   final _eventCallbacks = HashMap<int, Future<void> Function(Pointer<generated.mpv_event>)>();

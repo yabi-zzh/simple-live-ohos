@@ -22,8 +22,8 @@ void main() async {
     WidgetsFlutterBinding.ensureInitialized();
 
     // 日志开关，打包前改为 false
-    Log.enabled = false;
-    CoreLog.enableLog = false;
+    Log.enabled = true;
+    CoreLog.enableLog = true;
 
     // 全局错误处理
     FlutterError.onError = (details) {

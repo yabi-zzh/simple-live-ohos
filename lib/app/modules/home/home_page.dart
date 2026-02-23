@@ -53,6 +53,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           controller: _tabController,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
+          indicatorSize: TabBarIndicatorSize.label,
+          indicatorWeight: 3,
+          indicator: UnderlineTabIndicator(
+            borderRadius: BorderRadius.circular(2),
+            borderSide: BorderSide(
+              width: 3,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            insets: const EdgeInsets.symmetric(horizontal: 12),
+          ),
+          labelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          unselectedLabelStyle: const TextStyle(fontSize: 14),
           tabs: platforms.map((site) => Tab(text: site.name)).toList(),
         ),
       ),
