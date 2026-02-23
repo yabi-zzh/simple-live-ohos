@@ -12,13 +12,17 @@ import '../../services/history_service.dart';
 import '../../services/storage_service.dart';
 import '../../models/room_models.dart';
 import '../../services/danmaku_settings_service.dart';
+import '../../services/avsession_service.dart';
 import '../../utils/log_util.dart';
 
-class LiveRoomController extends GetxController {
+class LiveRoomController extends GetxController with WidgetsBindingObserver {
   final String roomId;
   final int platformIndex;
 
   LiveRoomController({required this.roomId, required this.platformIndex});
+
+  // 原生生命周期通道（绕过 WidgetsBindingObserver，直接从 EntryAbility 接收）
+  static const _lifecycleChannel = MethodChannel('com.simplelive/lifecycle');
 
   LiveSite get site => PlatformService.instance.getSite(platformIndex);
 
@@ -40,11 +44,13 @@ class LiveRoomController extends GetxController {
   final playUrls = <String>[].obs;
   final currentUrlIndex = 0.obs;
   final isSwitching = false.obs;
+  Map<String, String>? _currentHeaders;
 
   // 弹幕
   LiveDanmaku? _danmaku;
-  final danmakuMessages = <LiveMessage>[].obs;
   final chatMessages = <LiveMessage>[].obs;
+  /// 弹幕渲染回调（由 Page 注册，绕过 RxList 通知机制，避免消息丢失/重复）
+  void Function(LiveMessage msg)? onDanmakuRender;
   final online = 0.obs;
   final danmakuEnabled = true.obs;
 
@@ -59,12 +65,26 @@ class LiveRoomController extends GetxController {
   static const int _maxDanmakuRetry = 5;
   bool _isDisposing = false;
 
+  // AVSession 状态：播放器首次播放前不同步 PAUSE，避免 PAUSE->PLAY 快速翻转
+  bool _hasEverPlayed = false;
+
+  // 后台状态
+  bool _isInBackground = false;
+  bool _wasPlayingBeforeBackground = false;
+  int _bgResumeRetryCount = 0;
+  static const int _maxBgResumeRetry = 3;
+  DateTime? _backgroundEntryTime;
+  static const int _bgRefreshThresholdSeconds = 5;
+  bool _isRecoveringVideo = false;
+
   // Stream 订阅引用（用于 onClose 取消）
   final List<StreamSubscription> _subscriptions = [];
 
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
+    _lifecycleChannel.setMethodCallHandler(_handleNativeLifecycle);
     _enableWakelock();
 
     if (isMediaKitAvailable) {
@@ -74,7 +94,7 @@ class LiveRoomController extends GetxController {
           configuration: PlayerConfiguration(
             vo: null,
             logLevel: MPVLogLevel.error,
-            bufferSize: 64 * 1024 * 1024, // 64MB 缓冲，适合直播流
+            bufferSize: 32 * 1024 * 1024, // 32MB 缓冲
             ready: () {
               Log.i('LiveRoom', '播放器就绪回调触发');
             },
@@ -91,6 +111,23 @@ class LiveRoomController extends GetxController {
 
         _subscriptions.add(player!.stream.playing.listen((playing) {
           isPlaying.value = playing;
+          // 后台被系统暂停时，不同步 PAUSE 到 AVSession，尝试恢复播放
+          if (_isInBackground && !playing && _wasPlayingBeforeBackground) {
+            if (_bgResumeRetryCount < _maxBgResumeRetry) {
+              _bgResumeRetryCount++;
+              Log.i('LiveRoom', '后台播放被暂停，尝试恢复(${_bgResumeRetryCount}/$_maxBgResumeRetry)...');
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (!_isDisposing && _isInBackground && player != null && !isPlaying.value) {
+                  player!.play();
+                }
+              });
+            } else {
+              Log.w('LiveRoom', '后台恢复播放已达上限，同步 PAUSE');
+              _syncPlaybackState(false);
+            }
+            return;
+          }
+          _syncPlaybackState(playing);
         }));
         _subscriptions.add(player!.stream.buffering.listen((buffering) {
           isBuffering.value = buffering;
@@ -114,6 +151,9 @@ class LiveRoomController extends GetxController {
   @override
   void onClose() {
     _isDisposing = true;
+    onDanmakuRender = null;
+    _lifecycleChannel.setMethodCallHandler(null);
+    WidgetsBinding.instance.removeObserver(this);
     _hideControlsTimer?.cancel();
     _danmakuReconnectTimer?.cancel();
     for (final sub in _subscriptions) {
@@ -123,6 +163,7 @@ class LiveRoomController extends GetxController {
     _danmaku?.stop();
     player?.dispose();
     _disableWakelock();
+    AVSessionService.instance.deactivate();
     // 确保退出时恢复竖屏
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -140,9 +181,10 @@ class LiveRoomController extends GetxController {
         nativePlayer.setProperty('video-sync', 'audio');
         // 直播流缓存策略
         nativePlayer.setProperty('cache', 'yes');
-        nativePlayer.setProperty('cache-secs', '5');
-        // 降低直播延迟
-        nativePlayer.setProperty('demuxer-lavf-o', 'fflags=+nobuffer');
+        nativePlayer.setProperty('cache-secs', '2');
+        // 降低直播延迟：减少探测数据量和分析时长，加快首帧
+        nativePlayer.setProperty('demuxer-lavf-o',
+            'fflags=+nobuffer,probesize=32768,analyzeduration=500000');
         Log.i('LiveRoom', 'mpv 参数配置完成');
       }
     } catch (e) {
@@ -175,14 +217,19 @@ class LiveRoomController extends GetxController {
       final roomDetail = await site.getRoomDetail(roomId: roomId);
       detail.value = roomDetail;
 
-      // 添加观看历史
-      _addHistory(roomDetail);
-
       if (!roomDetail.status) {
+        // 未开播也记录历史
+        Future.microtask(() => _addHistory(roomDetail));
         errorMsg.value = '主播未开播';
         isLoading.value = false;
         return;
       }
+
+      // AVSession 只依赖 roomDetail，提前激活让系统播控中心更早可用
+      _activateAVSession(roomDetail);
+
+      // 历史记录写入不阻塞关键路径
+      Future.microtask(() => _addHistory(roomDetail));
 
       // 并行加载清晰度和启动弹幕
       await Future.wait([
@@ -255,6 +302,7 @@ class LiveRoomController extends GetxController {
         quality: quality,
       );
       playUrls.assignAll(urls.urls);
+      _currentHeaders = urls.headers;
       currentUrlIndex.value = 0;
       if (urls.urls.isNotEmpty) {
         _playUrl(urls.urls.first, urls.headers);
@@ -286,7 +334,7 @@ class LiveRoomController extends GetxController {
   }
 
   void _tryNextUrl() {
-    if (!playerAvailable.value) return;
+    if (!playerAvailable.value || playUrls.isEmpty) return;
     final nextIndex = currentUrlIndex.value + 1;
     if (nextIndex < playUrls.length) {
       currentUrlIndex.value = nextIndex;
@@ -298,7 +346,7 @@ class LiveRoomController extends GetxController {
         duration: const Duration(seconds: 2),
         margin: const EdgeInsets.all(12),
       );
-      _playUrl(playUrls[nextIndex], null);
+      _playUrl(playUrls[nextIndex], _currentHeaders);
     } else {
       Log.w('LiveRoom', '所有线路均失败');
       Get.snackbar(
@@ -379,16 +427,12 @@ class LiveRoomController extends GetxController {
       if (DanmakuSettingsService.instance.shouldFilter(msg.message)) return;
 
       chatMessages.add(msg);
-      // 保留最近200条聊天
-      if (chatMessages.length > 200) {
+      // 累积到 250 条再截断到 200，减少 removeRange 触发频率
+      if (chatMessages.length > 250) {
         chatMessages.removeRange(0, chatMessages.length - 200);
       }
       if (danmakuEnabled.value) {
-        danmakuMessages.add(msg);
-        // 保留最近100条弹幕渲染消息
-        if (danmakuMessages.length > 100) {
-          danmakuMessages.removeRange(0, danmakuMessages.length - 100);
-        }
+        onDanmakuRender?.call(msg);
       }
     }
   }
@@ -458,7 +502,162 @@ class LiveRoomController extends GetxController {
   void switchLine(int index) {
     if (index >= 0 && index < playUrls.length) {
       currentUrlIndex.value = index;
-      _playUrl(playUrls[index], null);
+      _playUrl(playUrls[index], _currentHeaders);
     }
+  }
+
+  // ==================== AVSession 后台播控 ====================
+
+  /// 原生生命周期通道处理（主要机制）
+  Future<dynamic> _handleNativeLifecycle(MethodCall call) async {
+    switch (call.method) {
+      case 'onBackground':
+        _onEnterBackground();
+        break;
+      case 'onForeground':
+        _onEnterForeground();
+        break;
+    }
+    return null;
+  }
+
+  /// Flutter 生命周期回调（备用机制）
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      _onEnterBackground();
+    } else if (state == AppLifecycleState.resumed) {
+      _onEnterForeground();
+    }
+  }
+
+  void _onEnterBackground() {
+    if (_isInBackground) return;
+    _isInBackground = true;
+    _backgroundEntryTime = DateTime.now();
+    _wasPlayingBeforeBackground = isPlaying.value;
+    _bgResumeRetryCount = 0;
+    Log.i('LiveRoom', '进入后台, wasPlaying=$_wasPlayingBeforeBackground');
+    // 后台静音：保持流连接存活但不播放声音
+    _setMute(true);
+  }
+
+  void _onEnterForeground() {
+    if (!_isInBackground) return;
+    _isInBackground = false;
+    _bgResumeRetryCount = 0;
+    // 恢复声音
+    _setMute(false);
+    final bgDuration = _backgroundEntryTime != null
+        ? DateTime.now().difference(_backgroundEntryTime!)
+        : Duration.zero;
+    final stillPlaying = isPlaying.value;
+    Log.i('LiveRoom', '回到前台, 后台时长=${bgDuration.inSeconds}s, 流存活=$stillPlaying');
+
+    if (!_wasPlayingBeforeBackground || !playerAvailable.value) return;
+
+    if (stillPlaying) {
+      // 音频仍在播放 → 流连接存活，只需刷新视频渲染管线
+      _recoverVideoOnly();
+    } else if (bgDuration.inSeconds >= _bgRefreshThresholdSeconds) {
+      // 音频已停止 + 后台时间较长 → 流可能已断，直接重连
+      _reconnectStream();
+    }
+  }
+
+  /// 设置播放器静音/取消静音
+  void _setMute(bool mute) {
+    if (player == null) return;
+    try {
+      final nativePlayer = player!.platform;
+      if (nativePlayer is NativePlayer) {
+        nativePlayer.setProperty('mute', mute ? 'yes' : 'no');
+        Log.d('LiveRoom', '静音状态: $mute');
+      }
+    } catch (e) {
+      Log.w('LiveRoom', '设置静音失败: $e');
+    }
+  }
+
+  /// 流连接存活时的快速恢复：仅刷新视频输出管线。
+  ///
+  /// 音频仍在播放说明 mpv 的 demuxer/网络层正常工作，
+  /// 只是 GPU 渲染上下文可能被系统回收。
+  /// 通过 vid=no → vid=auto 强制 mpv 重建 VO，不重连网络流。
+  Future<void> _recoverVideoOnly() async {
+    if (_isRecoveringVideo) return;
+    _isRecoveringVideo = true;
+    try {
+      if (_isDisposing || player == null) return;
+      final nativePlayer = player!.platform;
+      if (nativePlayer is NativePlayer) {
+        Log.i('LiveRoom', '快速路径: 流存活，刷新 VO (vid=no/auto)');
+        nativePlayer.setProperty('vid', 'no');
+        await Future.delayed(const Duration(milliseconds: 50));
+        if (_isDisposing || _isInBackground) return;
+        nativePlayer.setProperty('vid', 'auto');
+        Log.i('LiveRoom', 'VO 刷新完成');
+      }
+    } finally {
+      _isRecoveringVideo = false;
+    }
+  }
+
+  /// 流已断开时的重连：直接重新打开当前流地址。
+  Future<void> _reconnectStream() async {
+    if (_isRecoveringVideo) return;
+    _isRecoveringVideo = true;
+    try {
+      // 等待 Flutter Surface 重建
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (_isDisposing || _isInBackground || !playerAvailable.value) return;
+
+      if (playUrls.isNotEmpty) {
+        Log.i('LiveRoom', '流已断开，直接重连当前线路');
+        _playUrl(playUrls[currentUrlIndex.value], _currentHeaders);
+      }
+    } finally {
+      _isRecoveringVideo = false;
+    }
+  }
+
+  void _activateAVSession(LiveRoomDetail roomDetail) {
+    final siteName = site.name;
+    AVSessionService.instance.activate(
+      title: roomDetail.title,
+      artist: '${roomDetail.userName} ($siteName)',
+      mediaImage: roomDetail.cover,
+      assetId: roomDetail.roomId,
+    );
+    AVSessionService.instance.onCommand = _onAVSessionCommand;
+  }
+
+  void _onAVSessionCommand(AVSessionCommand command) {
+    switch (command) {
+      case AVSessionCommand.play:
+        if (player != null && !isPlaying.value) {
+          player!.play();
+        }
+        break;
+      case AVSessionCommand.pause:
+        if (player != null && isPlaying.value) {
+          player!.pause();
+        }
+        break;
+      case AVSessionCommand.stop:
+        player?.pause();
+        break;
+    }
+  }
+
+  void _syncPlaybackState(bool playing) {
+    // 播放器首次播放前忽略 PAUSE 事件，避免 activate 后立即 PAUSE->PLAY 翻转
+    if (!_hasEverPlayed) {
+      if (!playing) return;
+      _hasEverPlayed = true;
+    }
+    AVSessionService.instance.updatePlaybackState(playing ? 0 : 1);
   }
 }

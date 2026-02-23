@@ -22,7 +22,6 @@ class LiveRoomPage extends StatefulWidget {
 class _LiveRoomPageState extends State<LiveRoomPage> {
   late LiveRoomController _controller;
   DanmakuController? _danmakuController;
-  Worker? _danmakuWorker;
   Worker? _danmakuSettingsWorker;
 
   @override
@@ -34,16 +33,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       platformIndex: args['platformIndex'] as int,
     ));
 
-    // 监听弹幕消息，发送到弹幕渲染层
-    _danmakuWorker = ever(_controller.danmakuMessages, (messages) {
-      if (messages.isNotEmpty && _danmakuController != null) {
-        final msg = messages.last;
+    // 注册弹幕渲染回调（直接回调，避免 ever + RxList 的消息丢失/重复问题）
+    _controller.onDanmakuRender = (msg) {
+      if (_danmakuController != null) {
         _danmakuController!.addDanmaku(DanmakuContentItem(
           msg.message,
           color: Color.fromARGB(255, msg.color.r, msg.color.g, msg.color.b),
         ));
       }
-    });
+    };
 
     // 监听弹幕设置变化，实时更新渲染参数（不重建 DanmakuScreen）
     _danmakuSettingsWorker = ever(
@@ -61,7 +59,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   @override
   void dispose() {
-    _danmakuWorker?.dispose();
+    _controller.onDanmakuRender = null;
     _danmakuSettingsWorker?.dispose();
     super.dispose();
   }
@@ -259,9 +257,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           // 播放器 + 手势层（填满整个区域）
           Positioned.fill(
             child: GestureDetector(
-              onTap: _controller.isFullscreen.value
-                  ? _controller.toggleControls
-                  : null,
+              onTap: _controller.toggleControls,
               child: Container(
                 color: Colors.black,
                 child: Video(
@@ -271,6 +267,28 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               ),
             ),
           ),
+          // 封面占位层：首帧渲染前显示封面图，出画面后淡出
+          Obx(() {
+            final cover = _controller.detail.value?.cover;
+            final playing = _controller.isPlaying.value;
+            if (cover == null || cover.isEmpty) return const SizedBox.shrink();
+            return AnimatedOpacity(
+              opacity: playing ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: IgnorePointer(
+                ignoring: playing,
+                child: GestureDetector(
+                  onTap: _controller.toggleControls,
+                  child: Container(
+                    color: Colors.black,
+                    child: Center(
+                      child: NetImage(cover, fit: BoxFit.contain),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
           // 弹幕层（只创建一次，通过 updateOption 实时更新配置）
           Positioned(
             top: _controller.isFullscreen.value
@@ -299,7 +317,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           Obx(() {
             final switching = _controller.isSwitching.value;
             final buffering = _controller.isBuffering.value;
-            if (!switching && !buffering) return const SizedBox.shrink();
+            final playing = _controller.isPlaying.value;
+            // 播放器已在播放时，不显示缓冲转圈（mpv 的 buffering 事件与首帧渲染不严格同步）
+            if (!switching && (!buffering || playing)) return const SizedBox.shrink();
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -334,12 +354,19 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   )),
             )
           else
-            // 竖屏：底部极简控制条常驻显示
+            // 竖屏：底部极简控制条，几秒后自动隐藏
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
-              child: _buildPortraitOverlay(),
+              child: Obx(() => AnimatedOpacity(
+                    opacity: _controller.showControls.value ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: IgnorePointer(
+                      ignoring: !_controller.showControls.value,
+                      child: _buildPortraitOverlay(),
+                    ),
+                  )),
             ),
         ],
       );

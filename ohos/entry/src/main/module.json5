@@ -30,12 +30,15 @@
               "action.system.home"
             ]
           }
-        ]
+        ],
+        "backgroundModes": ["audioPlayback"]
       }
     ],
     "requestPermissions": [
       {"name" :  "ohos.permission.INTERNET"},
-      {"name" :  "ohos.permission.RUNNING_LOCK"}
+      {"name" :  "ohos.permission.GET_NETWORK_INFO"},
+      {"name" :  "ohos.permission.RUNNING_LOCK"},
+      {"name" :  "ohos.permission.KEEP_BACKGROUND_RUNNING"}
     ]
   }
 }
