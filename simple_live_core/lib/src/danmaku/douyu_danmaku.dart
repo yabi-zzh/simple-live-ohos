@@ -64,6 +64,7 @@ class DouyuDanmaku implements LiveDanmaku {
     onMessage = null;
     onClose = null;
     webScoketUtils?.close();
+    webScoketUtils = null;
   }
 
   void decodeMessage(List<int> data) {

@@ -87,6 +87,7 @@ class WebScoketUtils {
   /// 连接完成
   void ready() {
     status = SocketStatus.connected;
+    reconnectTime = 0;
 
     streamSubscription = webSocket?.stream.listen(
       (data) => receiveMessage(data),

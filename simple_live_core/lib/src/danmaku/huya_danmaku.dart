@@ -73,7 +73,7 @@ class HuyaDanmaku implements LiveDanmaku {
 
   void joinRoom() {
     var joinData =
-        getJoinData(danmakuArgs.ayyuid, danmakuArgs.topSid, danmakuArgs.topSid);
+        getJoinData(danmakuArgs.ayyuid, danmakuArgs.topSid, danmakuArgs.subSid);
     webScoketUtils?.sendMessage(joinData);
   }
 
@@ -109,6 +109,7 @@ class HuyaDanmaku implements LiveDanmaku {
     onMessage = null;
     onClose = null;
     webScoketUtils?.close();
+    webScoketUtils = null;
   }
 
   void decodeMessage(List<int> data) {

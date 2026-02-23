@@ -113,6 +113,7 @@ class BiliBiliDanmaku implements LiveDanmaku {
     onMessage = null;
     onClose = null;
     webScoketUtils?.close();
+    webScoketUtils = null;
   }
 
   List<int> encodeData(String msg, int action) {

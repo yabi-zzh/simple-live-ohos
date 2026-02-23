@@ -97,7 +97,7 @@ class DouyinDanmaku implements LiveDanmaku {
       url: url,
       backupUrl: backupUrl,
       headers: {
-        "User-Agnet": DouyinSite.kDefaultUserAgent,
+        "User-Agent": DouyinSite.kDefaultUserAgent,
         "Cookie": danmakuArgs.cookie,
         "Origin": "https://live.douyin.com",
       },
@@ -184,7 +184,7 @@ class DouyinDanmaku implements LiveDanmaku {
     var obj = PushFrame();
     obj.payloadType = 'ack';
     obj.logId = logId;
-    obj.payloadType = internalExt;
+    obj.payload = utf8.encode(internalExt);
     webScoketUtils?.sendMessage(obj.writeToBuffer());
   }
 
@@ -199,5 +199,6 @@ class DouyinDanmaku implements LiveDanmaku {
     onMessage = null;
     onClose = null;
     webScoketUtils?.close();
+    webScoketUtils = null;
   }
 }
