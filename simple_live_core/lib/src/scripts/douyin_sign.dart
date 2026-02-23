@@ -10647,33 +10647,48 @@ function getMSSDKSignature(msStub, userAgent) {
 }
 ''';
 
+  /// ABogus 函数是否已注入 WebView 全局作用域
+  static bool _aBogusLoaded = false;
+
   static const String defaultUserAgent = DouyinSite.kDefaultUserAgent;
   static Future<String> getAbogusUrl(String url, String userAgent) async {
     final msToken = generateMsToken(107);
     var params = ('$url&msToken=$msToken').split('?')[1];
     var query = params.contains("?") ? params.split("?")[1] : params;
-    var jsCode = '''
-$kABogus
-getABogus('$query', '$userAgent')
-''';
+    final callCode = "getABogus('$query', '$userAgent')";
+    String jsCode;
+    if (!_aBogusLoaded) {
+      jsCode = '$kABogus\n$callCode';
+    } else {
+      jsCode = callCode;
+    }
     var aBogus = await JsExecutorManager.instance.execute(jsCode);
+    _aBogusLoaded = true;
     var newUrl =
         '$url&msToken=${Uri.encodeComponent(msToken)}&a_bogus=${Uri.encodeComponent(aBogus)}';
     return newUrl;
   }
 
+  /// WebMsSDK 函数是否已注入 WebView 全局作用域
+  static bool _webMsSdkLoaded = false;
+
   static Future<String> getSignature(String roomId, String uniqueId) async {
     var msStub = getMsStub(roomId, uniqueId);
-    var jsCode = '''
-$kWebMsSDK
-getMSSDKSignature('$msStub','$defaultUserAgent')
-''';
+    final callCode = "getMSSDKSignature('$msStub','$defaultUserAgent')";
+    String jsCode;
+    if (!_webMsSdkLoaded) {
+      jsCode = '$kWebMsSDK\n$callCode';
+    } else {
+      jsCode = callCode;
+    }
 
     var signature = await JsExecutorManager.instance.execute(jsCode);
+    _webMsSdkLoaded = true;
     // 如果signature中包含-或=，重新生成（最多重试10次）
+    // 重试时库已在 WebView 全局作用域中，只需发送函数调用
     int retryCount = 0;
     while ((signature.contains('-') || signature.contains('=')) && retryCount < 10) {
-      signature = await JsExecutorManager.instance.execute(jsCode);
+      signature = await JsExecutorManager.instance.execute(callCode);
       retryCount++;
     }
     return signature;
