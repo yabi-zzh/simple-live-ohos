@@ -5,6 +5,7 @@ import '../home/home_page.dart';
 import '../category/category_page.dart';
 import '../follow/follow_page.dart';
 import '../mine/mine_page.dart';
+import '../../utils/responsive.dart';
 
 class IndexPage extends GetView<IndexController> {
   const IndexPage({super.key});
@@ -16,43 +17,80 @@ class IndexPage extends GetView<IndexController> {
     MinePage.new,
   ];
 
+  static const _destinations = [
+    NavigationDestination(
+      icon: Icon(Icons.home_outlined),
+      selectedIcon: Icon(Icons.home),
+      label: '首页',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.category_outlined),
+      selectedIcon: Icon(Icons.category),
+      label: '分类',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.favorite_outline),
+      selectedIcon: Icon(Icons.favorite),
+      label: '关注',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.person_outline),
+      selectedIcon: Icon(Icons.person),
+      label: '我的',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final useRail = Responsive.isTablet(context);
+
     return Obx(() {
       final index = controller.currentIndex.value;
+
+      final body = _LazyIndexedStack(
+        index: index,
+        builders: _pageBuilders,
+      );
+
+      if (useRail) {
+        return Scaffold(
+          body: Row(
+            children: [
+              NavigationRail(
+                leading: SizedBox(height: MediaQuery.of(context).viewPadding.top),
+                selectedIndex: index,
+                onDestinationSelected: controller.changePage,
+                labelType: NavigationRailLabelType.all,
+                destinations: _destinations
+                    .map((d) => NavigationRailDestination(
+                          icon: d.icon,
+                          selectedIcon: d.selectedIcon,
+                          label: Text(d.label),
+                        ))
+                    .toList(),
+              ),
+              const VerticalDivider(width: 1, thickness: 1),
+              Expanded(child: body),
+            ],
+          ),
+        );
+      }
+
       return Scaffold(
-        body: _LazyIndexedStack(
-          index: index,
-          builders: _pageBuilders,
-        ),
+        body: body,
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: index,
           onTap: controller.changePage,
           type: BottomNavigationBarType.fixed,
           selectedItemColor: Theme.of(context).colorScheme.primary,
           unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: '首页',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.category_outlined),
-              activeIcon: Icon(Icons.category),
-              label: '分类',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.favorite_outline),
-              activeIcon: Icon(Icons.favorite),
-              label: '关注',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: '我的',
-            ),
-          ],
+          items: _destinations
+              .map((d) => BottomNavigationBarItem(
+                    icon: d.icon,
+                    activeIcon: d.selectedIcon,
+                    label: d.label,
+                  ))
+              .toList(),
         ),
       );
     });

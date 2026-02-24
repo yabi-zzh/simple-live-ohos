@@ -5,6 +5,7 @@ import '../../services/history_service.dart';
 import '../../models/room_models.dart';
 import '../../widgets/net_image.dart';
 import '../../widgets/empty_view.dart';
+import '../../utils/responsive.dart';
 
 class HistoryPage extends StatelessWidget {
   const HistoryPage({super.key});
@@ -29,15 +30,17 @@ class HistoryPage extends StatelessWidget {
           return const EmptyView(text: '暂无观看记录');
         }
         final grouped = _groupByDate(service.histories);
-        return ListView.builder(
-          itemCount: grouped.length,
-          itemBuilder: (context, index) {
-            final entry = grouped[index];
-            if (entry is String) {
-              return _buildSectionHeader(context, entry);
-            }
-            return _buildHistoryItem(context, entry as HistoryRoom, service);
-          },
+        return Responsive.constrainedContent(
+          child: ListView.builder(
+            itemCount: grouped.length,
+            itemBuilder: (context, index) {
+              final entry = grouped[index];
+              if (entry is String) {
+                return _buildSectionHeader(context, entry);
+              }
+              return _buildHistoryItem(context, entry as HistoryRoom, service);
+            },
+          ),
         );
       }),
     );

@@ -7,6 +7,7 @@ import '../../services/history_service.dart';
 import '../../services/danmaku_settings_service.dart';
 import '../../services/storage_service.dart';
 import '../index/index_controller.dart';
+import '../../utils/responsive.dart';
 
 class MinePage extends StatelessWidget {
   MinePage({super.key});
@@ -21,7 +22,8 @@ class MinePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('我的'),
       ),
-      body: ListView(
+      body: Responsive.constrainedContent(
+        child: ListView(
         children: [
           // 统计卡片
           _buildStatsCard(context, colorScheme),
@@ -101,6 +103,7 @@ class MinePage extends StatelessWidget {
           ]),
           const SizedBox(height: 16),
         ],
+      ),
       ),
     );
   }
@@ -210,6 +213,7 @@ class MinePage extends StatelessWidget {
     final current = StorageService.instance.getValue<int>('preferred_quality', 0);
     showModalBottomSheet(
       context: context,
+      constraints: const BoxConstraints(maxWidth: Responsive.maxSheetWidth),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -248,6 +252,7 @@ class MinePage extends StatelessWidget {
     final service = DanmakuSettingsService.instance;
     showModalBottomSheet(
       context: context,
+      constraints: const BoxConstraints(maxWidth: Responsive.maxSheetWidth),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),

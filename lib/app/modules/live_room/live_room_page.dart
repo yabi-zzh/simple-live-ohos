@@ -11,6 +11,7 @@ import '../../models/room_models.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/net_image.dart';
+import '../../utils/responsive.dart';
 
 class LiveRoomPage extends StatefulWidget {
   const LiveRoomPage({super.key});
@@ -138,12 +139,41 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       if (isFullscreen) {
         return _buildPlayerArea();
       }
-      return Column(
-        children: [
-          _buildPlayerArea(),
-          _buildRoomInfoBar(),
-          Expanded(child: _buildChatList()),
-        ],
+
+      // 宽屏非全屏：左右分栏（播放器+信息 | 弹幕列表）
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth >= Responsive.expandedBreakpoint) {
+            return Row(
+              children: [
+                // 左侧：播放器 + 房间信息
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    children: [
+                      _buildPlayerArea(),
+                      _buildRoomInfoBar(),
+                    ],
+                  ),
+                ),
+                const VerticalDivider(width: 1, thickness: 1),
+                // 右侧：弹幕/聊天列表
+                Expanded(
+                  flex: 2,
+                  child: _buildChatList(),
+                ),
+              ],
+            );
+          }
+          // 窄屏：上下结构
+          return Column(
+            children: [
+              _buildPlayerArea(),
+              _buildRoomInfoBar(),
+              Expanded(child: _buildChatList()),
+            ],
+          );
+        },
       );
     });
   }
@@ -1183,6 +1213,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      constraints: const BoxConstraints(maxWidth: Responsive.maxSheetWidth),
       builder: (ctx) => ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(ctx).size.height * 0.6,
@@ -1229,6 +1260,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      constraints: const BoxConstraints(maxWidth: Responsive.maxSheetWidth),
       builder: (ctx) => ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(ctx).size.height * 0.6,
@@ -1274,6 +1306,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      constraints: const BoxConstraints(maxWidth: Responsive.maxSheetWidth),
       builder: (ctx) => ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(ctx).size.height * 0.7,

@@ -4,6 +4,7 @@ import 'search_controller.dart' as search;
 import '../../widgets/room_card.dart';
 import '../../widgets/empty_view.dart';
 import '../../services/platform_service.dart';
+import '../../utils/responsive.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -169,24 +170,29 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
         }
         return false;
       },
-      child: GridView.builder(
-        padding: const EdgeInsets.all(8),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 1.05,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-        ),
-        itemCount: _controller.rooms.length,
-        itemBuilder: (context, index) {
-          final room = _controller.rooms[index];
-          return RoomCard(
-            room: room,
-            platformIndex: _controller.currentPlatform.value,
-            onTap: () => Get.toNamed('/live-room', arguments: {
-              'roomId': room.roomId,
-              'platformIndex': _controller.currentPlatform.value,
-            }),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final crossAxisCount = Responsive.gridCrossAxisCount(constraints.maxWidth);
+          return GridView.builder(
+            padding: const EdgeInsets.all(8),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              childAspectRatio: Responsive.gridChildAspectRatio(constraints.maxWidth, crossAxisCount),
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: _controller.rooms.length,
+            itemBuilder: (context, index) {
+              final room = _controller.rooms[index];
+              return RoomCard(
+                room: room,
+                platformIndex: _controller.currentPlatform.value,
+                onTap: () => Get.toNamed('/live-room', arguments: {
+                  'roomId': room.roomId,
+                  'platformIndex': _controller.currentPlatform.value,
+                }),
+              );
+            },
           );
         },
       ),
@@ -206,37 +212,39 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
         }
         return false;
       },
-      child: ListView.builder(
-        itemCount: _controller.anchors.length,
-        itemBuilder: (context, index) {
-          final anchor = _controller.anchors[index];
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundImage: NetworkImage(anchor.avatar),
-            ),
-            title: Text(anchor.userName),
-            subtitle: Text(anchor.liveStatus ? '直播中' : '未开播'),
-            trailing: anchor.liveStatus
-                ? const Icon(Icons.play_circle_outline, color: Colors.red)
-                : null,
-            onTap: () {
-              if (anchor.liveStatus) {
-                Get.toNamed('/live-room', arguments: {
-                  'roomId': anchor.roomId,
-                  'platformIndex': _controller.currentPlatform.value,
-                });
-              } else {
-                Get.snackbar(
-                  '提示',
-                  '主播未开播',
-                  snackPosition: SnackPosition.BOTTOM,
-                  duration: const Duration(seconds: 2),
-                  margin: const EdgeInsets.all(12),
-                );
-              }
-            },
-          );
-        },
+      child: Responsive.constrainedContent(
+        child: ListView.builder(
+          itemCount: _controller.anchors.length,
+          itemBuilder: (context, index) {
+            final anchor = _controller.anchors[index];
+            return ListTile(
+              leading: CircleAvatar(
+                backgroundImage: NetworkImage(anchor.avatar),
+              ),
+              title: Text(anchor.userName),
+              subtitle: Text(anchor.liveStatus ? '直播中' : '未开播'),
+              trailing: anchor.liveStatus
+                  ? const Icon(Icons.play_circle_outline, color: Colors.red)
+                  : null,
+              onTap: () {
+                if (anchor.liveStatus) {
+                  Get.toNamed('/live-room', arguments: {
+                    'roomId': anchor.roomId,
+                    'platformIndex': _controller.currentPlatform.value,
+                  });
+                } else {
+                  Get.snackbar(
+                    '提示',
+                    '主播未开播',
+                    snackPosition: SnackPosition.BOTTOM,
+                    duration: const Duration(seconds: 2),
+                    margin: const EdgeInsets.all(12),
+                  );
+                }
+              },
+            );
+          },
+        ),
       ),
     );
   }

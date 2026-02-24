@@ -4,6 +4,7 @@ import 'category_room_controller.dart';
 import '../../widgets/room_card.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
+import '../../utils/responsive.dart';
 
 class CategoryRoomPage extends StatelessWidget {
   const CategoryRoomPage({super.key});
@@ -44,12 +45,12 @@ class CategoryRoomPage extends StatelessWidget {
             },
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
+                final crossAxisCount = Responsive.gridCrossAxisCount(constraints.maxWidth);
                 return GridView.builder(
                   padding: const EdgeInsets.all(8),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
-                    childAspectRatio: 1.05,
+                    childAspectRatio: Responsive.gridChildAspectRatio(constraints.maxWidth, crossAxisCount),
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),

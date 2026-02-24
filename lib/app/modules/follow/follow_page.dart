@@ -6,6 +6,7 @@ import '../../models/room_models.dart';
 import '../../widgets/net_image.dart';
 import '../../widgets/empty_view.dart';
 import '../index/index_controller.dart';
+import '../../utils/responsive.dart';
 
 class FollowPage extends StatefulWidget {
   const FollowPage({super.key});
@@ -69,12 +70,14 @@ class _FollowPageState extends State<FollowPage> {
         }
         return RefreshIndicator(
           onRefresh: service.refreshLiveStatus,
-          child: ListView.builder(
-            itemCount: service.favorites.length,
-            itemBuilder: (context, index) {
-              final room = service.favorites[index];
-              return _buildFavoriteItem(context, room, service);
-            },
+          child: Responsive.constrainedContent(
+            child: ListView.builder(
+              itemCount: service.favorites.length,
+              itemBuilder: (context, index) {
+                final room = service.favorites[index];
+                return _buildFavoriteItem(context, room, service);
+              },
+            ),
           ),
         );
       }),

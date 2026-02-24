@@ -5,6 +5,7 @@ import '../../widgets/room_card.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 import '../../services/platform_service.dart';
+import '../../utils/responsive.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -91,31 +92,31 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               return false;
             },
             child: LayoutBuilder(
-            builder: (context, constraints) {
-              final crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
-              return GridView.builder(
-                padding: const EdgeInsets.all(8),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: 1.05,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-            itemCount: _controller.rooms.length,
-            itemBuilder: (context, index) {
-              final room = _controller.rooms[index];
-              return RoomCard(
-                room: room,
-                platformIndex: _controller.currentPlatform.value,
-                onTap: () => Get.toNamed('/live-room', arguments: {
-                  'roomId': room.roomId,
-                  'platformIndex': _controller.currentPlatform.value,
-                }),
-              );
-            },
-          );
-            },
-          ),
+              builder: (context, constraints) {
+                final crossAxisCount = Responsive.gridCrossAxisCount(constraints.maxWidth);
+                return GridView.builder(
+                  padding: const EdgeInsets.all(8),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    childAspectRatio: Responsive.gridChildAspectRatio(constraints.maxWidth, crossAxisCount),
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: _controller.rooms.length,
+                  itemBuilder: (context, index) {
+                    final room = _controller.rooms[index];
+                    return RoomCard(
+                      room: room,
+                      platformIndex: _controller.currentPlatform.value,
+                      onTap: () => Get.toNamed('/live-room', arguments: {
+                        'roomId': room.roomId,
+                        'platformIndex': _controller.currentPlatform.value,
+                      }),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         );
       }),

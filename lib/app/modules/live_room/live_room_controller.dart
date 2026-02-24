@@ -14,6 +14,7 @@ import '../../models/room_models.dart';
 import '../../services/danmaku_settings_service.dart';
 import '../../services/avsession_service.dart';
 import '../../utils/log_util.dart';
+import '../../utils/responsive.dart';
 
 class LiveRoomController extends GetxController with WidgetsBindingObserver {
   final String roomId;
@@ -164,8 +165,10 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
     player?.dispose();
     _disableWakelock();
     AVSessionService.instance.deactivate();
-    // 确保退出时恢复竖屏
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    // 确保退出时恢复方向设置（平板允许自由旋转，手机锁定竖屏）
+    SystemChrome.setPreferredOrientations(
+      Responsive.isTabletDevice ? DeviceOrientation.values : [DeviceOrientation.portraitUp],
+    );
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.onClose();
   }
@@ -468,9 +471,10 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
       ]);
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
-      await SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-      ]);
+      // 平板允许自由旋转，手机锁定竖屏
+      await SystemChrome.setPreferredOrientations(
+        Responsive.isTabletDevice ? DeviceOrientation.values : [DeviceOrientation.portraitUp],
+      );
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
     resetHideTimer();
