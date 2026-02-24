@@ -80,16 +80,18 @@ flutter pub get
 
 3. 构建运行
 
-**方式一：DevEco Studio（推荐）**
+**方式一：DevEco Studio**
 
 使用 DevEco Studio 打开 `ohos` 目录，点击 Run 即可调试运行。
 
 **方式二：命令行**
 ```bash
+# 调试运行
 flutter run
-```
 
-> 注意：`flutter build hap --release` 命令行打包可能因 media_kit 原生模块的 cmake 构建问题而失败，建议使用 DevEco Studio 进行正式打包。
+# 打包 release
+flutter build hap --release
+```
 
 4. （可选）清理构建缓存，依赖变更或构建异常时执行：
 ```bash
@@ -103,7 +105,7 @@ flutter pub get
 simple-live-ohos/
 ├── lib/                    # Flutter 应用代码
 ├── ohos/                   # HarmonyOS 原生代码
-├── media-kit/              # 视频播放库（本地依赖，含 libmpv.so）
+├── media-kit/              # 视频播放库（本地依赖，含 libmpv 预编译库）
 ├── simple_live_core/       # 直播平台 API 核心库
 ├── plugins/                # 本地插件
 │   ├── canvas_danmaku/     # 弹幕渲染
@@ -126,7 +128,7 @@ simple-live-ohos/
 
 - **flutter_ohos**: 3.27.4 ([OpenHarmony Flutter 分支](https://gitcode.com/openharmony-tpc/flutter_flutter))
 - **media_kit**: 使用 [Predidit/media-kit](https://github.com/Predidit/media-kit) 的 OpenHarmony 支持分支
-- **libmpv.so**: 34MB 原生视频播放库 (arm64-v8a)，来自 [ErBWs/libmpv-ohos-build](https://github.com/ErBWs/libmpv-ohos-build)
+- **libmpv**: 预编译原生视频播放库 (arm64-v8a)，来自 [ErBWs/libmpv-ohos-build](https://github.com/ErBWs/libmpv-ohos-build)
 - **canvas_danmaku**: 0.3.1 纯 Dart 弹幕渲染引擎
 - **js_executor_ohos**: 基于 WebView 的 JS 执行器，用于斗鱼/抖音签名计算
 - **simple_live_core**: 直播平台 API 核心库，来自原项目
@@ -145,7 +147,7 @@ simple-live-ohos/
 
 3. **原生库加载**
    - 修改 `native_library.dart` 添加 OHOS 平台加载逻辑，优先加载 `libmedia_kit_libs_ohos.so` 包装库，回退到 `libmpv.so.2`
-   - 更新 CMakeLists.txt 链接配置
+   - media_kit_libs_ohos 采用预构建 .so 方式，libmpv 及其依赖随 HAR 模块分发
 
 4. **API 兼容性修复**
    - canvas_danmaku：`Color.toARGB32()` -> `Color.value`

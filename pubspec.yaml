@@ -1,7 +1,7 @@
 name: simple_live_app
 description: "Simple Live - 多平台直播聚合应用"
 publish_to: 'none'
-version: 1.0.2
+version: 1.0.3+1000003
 homepage: https://github.com/yabi-zzh/simple-live-ohos
 repository: https://github.com/yabi-zzh/simple-live-ohos
 
