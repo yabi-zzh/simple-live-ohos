@@ -1,6 +1,7 @@
 
 import { FlutterAbility, FlutterEngine, MethodChannel } from '@ohos/flutter_ohos';
 import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant';
+import AVSessionPlugin from '../plugins/AVSessionPlugin';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const TAG = 'EntryAbility';
@@ -12,6 +13,7 @@ export default class EntryAbility extends FlutterAbility {
   configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine);
     GeneratedPluginRegistrant.registerWith(flutterEngine);
+    flutterEngine.getPlugins()?.add(new AVSessionPlugin());
     this.lifecycleChannel = new MethodChannel(
       flutterEngine.getDartExecutor().getBinaryMessenger(),
       'com.simplelive/lifecycle'

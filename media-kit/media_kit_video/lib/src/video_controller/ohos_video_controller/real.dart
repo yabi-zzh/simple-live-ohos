@@ -49,10 +49,6 @@ class OhosVideoController extends PlatformVideoController {
     return lock.synchronized(() async {
       final widValue = wid.value?.toString() ?? '0';
       await setProperties({'wid': widValue});
-      // Instead of seeking to the start (Duration.zero), seek to the current playback position
-      // without jumping the user to the start of the media.
-      final currentPosition = player.state.position;
-      await player.seek(currentPosition);
     });
   }
 
@@ -118,7 +114,12 @@ class OhosVideoController extends PlatformVideoController {
     Player player,
     VideoControllerConfiguration configuration,
   ) async {
-    final bool isEmulator = await _channel.invokeMethod('Utils.IsEmulator');
+    bool isEmulator = false;
+    try {
+      isEmulator = await _channel.invokeMethod('Utils.IsEmulator') ?? false;
+    } catch (_) {
+      // Plugin may not be ready yet, assume physical device.
+    }
     if (isEmulator) {
       throw UnsupportedError(
         '[VideoController] does not support emulator.'
