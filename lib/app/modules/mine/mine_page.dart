@@ -74,9 +74,64 @@ class MinePage extends StatelessWidget {
               onTap: () => _showQualityPicker(context),
             ),
             _MenuItem(
+              icon: Icons.phonelink_outlined,
+              title: '后台播放模式',
+              subtitle: Obx(() {
+                _refreshKey.value;
+                return _buildBgPlayModeLabel(colorScheme);
+              }),
+              onTap: () => _showBgPlayModePicker(context),
+            ),
+            _MenuItem(
+              icon: Icons.memory,
+              title: '硬件解码',
+              trailing: Obx(() {
+                _refreshKey.value;
+                return _buildHardwareDecodeSwitch();
+              }),
+            ),
+            _MenuItem(
+              icon: Icons.fullscreen,
+              title: '进入直播间自动全屏',
+              trailing: Obx(() {
+                _refreshKey.value;
+                return _buildAutoFullscreenSwitch();
+              }),
+            ),
+            _MenuItem(
+              icon: Icons.storage_outlined,
+              title: '播放器缓冲区',
+              subtitle: Obx(() {
+                _refreshKey.value;
+                return _buildBufferSizeLabel(colorScheme);
+              }),
+              onTap: () => _showBufferSizePicker(context),
+            ),
+            _MenuItem(
+              icon: Icons.timer_outlined,
+              title: '定时关闭',
+              subtitle: Obx(() {
+                _refreshKey.value;
+                return _buildAutoExitLabel(colorScheme);
+              }),
+              onTap: () => _showAutoExitPicker(context),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          _buildSection(context, [
+            _MenuItem(
               icon: Icons.text_fields,
               title: '弹幕设置',
               onTap: () => _showDanmakuSettings(context),
+            ),
+            _MenuItem(
+              icon: Icons.chat_outlined,
+              title: '聊天区文字大小',
+              subtitle: Obx(() {
+                _refreshKey.value;
+                return _buildChatTextSizeLabel(colorScheme);
+              }),
+              onTap: () => _showChatTextSizePicker(context),
             ),
           ]),
           const SizedBox(height: 10),
@@ -248,6 +303,234 @@ class MinePage extends StatelessWidget {
     ));
   }
 
+  // ==================== 后台播放模式 ====================
+
+  static const _bgPlayModeLabels = ['继续播放', '静音保持连接', '暂停'];
+
+  Widget _buildBgPlayModeLabel(ColorScheme colorScheme) {
+    final mode = StorageService.instance.getValue<int>('bg_play_mode', 1);
+    return Text(
+      _bgPlayModeLabels[mode.clamp(0, 2)],
+      style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+    );
+  }
+
+  void _showBgPlayModePicker(BuildContext context) {
+    final current = StorageService.instance.getValue<int>('bg_play_mode', 1);
+    showModalBottomSheet(
+      context: context,
+      constraints: const BoxConstraints(maxWidth: Responsive.maxSheetWidth),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('后台播放模式', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            ...List.generate(_bgPlayModeLabels.length, (i) => ListTile(
+              title: Text(_bgPlayModeLabels[i]),
+              subtitle: Text(
+                [
+                  '后台继续播放声音',
+                  '后台静音但保持流连接，回前台快速恢复',
+                  '后台暂停播放，回前台重新连接',
+                ][i],
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              trailing: i == current ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () {
+                StorageService.instance.setValue('bg_play_mode', i);
+                Navigator.pop(ctx);
+                _refreshKey.value++;
+              },
+            )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== 硬件解码 ====================
+
+  Widget _buildHardwareDecodeSwitch() {
+    final enabled = StorageService.instance.getValue<bool>('hardware_decode', true);
+    return Switch(
+      value: enabled,
+      onChanged: (v) {
+        StorageService.instance.setValue('hardware_decode', v);
+        _refreshKey.value++;
+      },
+    );
+  }
+
+  // ==================== 自动全屏 ====================
+
+  Widget _buildAutoFullscreenSwitch() {
+    final enabled = StorageService.instance.getValue<bool>('auto_fullscreen', false);
+    return Switch(
+      value: enabled,
+      onChanged: (v) {
+        StorageService.instance.setValue('auto_fullscreen', v);
+        _refreshKey.value++;
+      },
+    );
+  }
+
+  // ==================== 缓冲区大小 ====================
+
+  static const _bufferSizeOptions = [8, 16, 32, 64, 128];
+
+  Widget _buildBufferSizeLabel(ColorScheme colorScheme) {
+    final mb = StorageService.instance.getValue<int>('buffer_size', 32);
+    return Text(
+      '${mb}MB',
+      style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+    );
+  }
+
+  void _showBufferSizePicker(BuildContext context) {
+    final current = StorageService.instance.getValue<int>('buffer_size', 32);
+    showModalBottomSheet(
+      context: context,
+      constraints: const BoxConstraints(maxWidth: Responsive.maxSheetWidth),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('播放器缓冲区大小', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            ..._bufferSizeOptions.map((mb) => ListTile(
+              title: Text('${mb}MB'),
+              trailing: mb == current ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () {
+                StorageService.instance.setValue('buffer_size', mb);
+                Navigator.pop(ctx);
+                _refreshKey.value++;
+              },
+            )),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                '修改后在下次进入直播间时生效',
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== 定时关闭 ====================
+
+  static const _autoExitOptions = [0, 15, 30, 60, 90, 120];
+
+  Widget _buildAutoExitLabel(ColorScheme colorScheme) {
+    final min = StorageService.instance.getValue<int>('auto_exit_minutes', 0);
+    return Text(
+      min == 0 ? '关闭' : '$min 分钟',
+      style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+    );
+  }
+
+  void _showAutoExitPicker(BuildContext context) {
+    final current = StorageService.instance.getValue<int>('auto_exit_minutes', 0);
+    showModalBottomSheet(
+      context: context,
+      constraints: const BoxConstraints(maxWidth: Responsive.maxSheetWidth),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('定时关闭直播间', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            ..._autoExitOptions.map((min) => ListTile(
+              title: Text(min == 0 ? '关闭' : '$min 分钟'),
+              trailing: min == current ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () {
+                StorageService.instance.setValue('auto_exit_minutes', min);
+                Navigator.pop(ctx);
+                _refreshKey.value++;
+              },
+            )),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                '进入直播间后自动倒计时关闭',
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== 聊天区文字大小 ====================
+
+  Widget _buildChatTextSizeLabel(ColorScheme colorScheme) {
+    final size = StorageService.instance.getValue<double>('chat_text_size', 13.0);
+    return Text(
+      '${size.round()}',
+      style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+    );
+  }
+
+  void _showChatTextSizePicker(BuildContext context) {
+    final current = StorageService.instance.getValue<double>('chat_text_size', 13.0).obs;
+    showModalBottomSheet(
+      context: context,
+      constraints: const BoxConstraints(maxWidth: Responsive.maxSheetWidth),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('聊天区文字大小', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 16),
+              Obx(() => Row(
+                children: [
+                  const SizedBox(width: 80, child: Text('字号', style: TextStyle(fontSize: 14))),
+                  Expanded(
+                    child: Slider(
+                      value: current.value.clamp(10.0, 20.0),
+                      min: 10,
+                      max: 20,
+                      divisions: 10,
+                      onChanged: (v) {
+                        current.value = v;
+                        StorageService.instance.setValue('chat_text_size', v);
+                        _refreshKey.value++;
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 48,
+                    child: Text(
+                      '${current.value.round()}',
+                      textAlign: TextAlign.end,
+                      style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              )),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showDanmakuSettings(BuildContext context) {
     final service = DanmakuSettingsService.instance;
     showModalBottomSheet(
@@ -318,6 +601,16 @@ class MinePage extends StatelessWidget {
                   1.0,
                   service.updateArea,
                 ),
+                _buildSliderItem(
+                  context,
+                  '描边宽度',
+                  s.strokeWidth.toStringAsFixed(1),
+                  s.strokeWidth,
+                  0.0,
+                  5.0,
+                  service.updateStrokeWidth,
+                ),
+                _buildFontWeightItem(context, s.fontWeight, service),
               ],
             );
           }),
@@ -360,6 +653,35 @@ class MinePage extends StatelessWidget {
                 fontSize: 13,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFontWeightItem(BuildContext context, int weightIndex, DanmakuSettingsService service) {
+    const labels = ['w100', 'w200', 'w300', 'w400', 'w500', 'w600', 'w700', 'w800', 'w900'];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const SizedBox(width: 80, child: Text('字体粗细', style: TextStyle(fontSize: 14))),
+          Expanded(
+            child: Slider(
+              value: weightIndex.toDouble(),
+              min: 0,
+              max: 8,
+              divisions: 8,
+              onChanged: (v) => service.updateFontWeight(v.round()),
+            ),
+          ),
+          SizedBox(
+            width: 48,
+            child: Text(
+              labels[weightIndex.clamp(0, 8)],
+              textAlign: TextAlign.end,
+              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ),
         ],

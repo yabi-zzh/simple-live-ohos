@@ -7,6 +7,7 @@ import 'package:simple_live_core/simple_live_core.dart';
 import 'live_room_controller.dart';
 import '../../services/favorite_service.dart';
 import '../../services/danmaku_settings_service.dart';
+import '../../services/storage_service.dart';
 import '../../models/room_models.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
@@ -53,6 +54,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           area: s.area,
           duration: s.duration,
           opacity: s.opacity,
+          strokeWidth: s.strokeWidth,
+          fontWeight: s.fontWeight,
         ));
       },
     );
@@ -338,6 +341,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         area: DanmakuSettingsService.instance.settings.value.area,
                         duration: DanmakuSettingsService.instance.settings.value.duration,
                         opacity: DanmakuSettingsService.instance.settings.value.opacity,
+                        strokeWidth: DanmakuSettingsService.instance.settings.value.strokeWidth,
+                        fontWeight: DanmakuSettingsService.instance.settings.value.fontWeight,
                       ),
                     ),
                   )),
@@ -1134,6 +1139,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     }
 
     // 普通消息
+    final chatSize = StorageService.instance.getValue<double>('chat_text_size', 13.0);
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 300),
       tween: Tween(begin: 0.0, end: 1.0),
@@ -1153,7 +1159,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             ),
             child: RichText(
               text: TextSpan(
-                style: DefaultTextStyle.of(context).style.copyWith(fontSize: 13),
+                style: DefaultTextStyle.of(context).style.copyWith(fontSize: chatSize),
                 children: [
                   TextSpan(
                     text: '${msg.userName}: ',

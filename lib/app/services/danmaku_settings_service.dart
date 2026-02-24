@@ -68,6 +68,16 @@ class DanmakuSettingsService extends GetxService {
     await _save();
   }
 
+  Future<void> updateStrokeWidth(double value) async {
+    settings.value = settings.value.copyWith(strokeWidth: value);
+    await _save();
+  }
+
+  Future<void> updateFontWeight(int value) async {
+    settings.value = settings.value.copyWith(fontWeight: value);
+    await _save();
+  }
+
   Future<void> addShieldWord(String word) async {
     final trimmed = word.trim();
     if (trimmed.isEmpty) return;

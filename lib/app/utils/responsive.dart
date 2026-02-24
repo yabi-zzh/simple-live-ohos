@@ -50,7 +50,7 @@ class Responsive {
     final spacing = (crossAxisCount - 1) * 8.0; // crossAxisSpacing
     final cardWidth = (contentWidth - spacing) / crossAxisCount;
     final coverHeight = cardWidth * 9 / 16;
-    const textAreaHeight = 64.0;
+    const textAreaHeight = 66.0;
     return cardWidth / (coverHeight + textAreaHeight);
   }
 

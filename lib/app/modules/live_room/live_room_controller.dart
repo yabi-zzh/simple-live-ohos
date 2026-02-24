@@ -60,6 +60,9 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
   final isFullscreen = false.obs;
   Timer? _hideControlsTimer;
 
+  // 定时关闭
+  Timer? _autoExitTimer;
+
   // 弹幕重连
   Timer? _danmakuReconnectTimer;
   int _danmakuRetryCount = 0;
@@ -91,11 +94,12 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
     if (isMediaKitAvailable) {
       try {
         Log.i('LiveRoom', '开始创建播放器...');
+        final bufferMB = StorageService.instance.getValue<int>('buffer_size', 32);
         player = Player(
           configuration: PlayerConfiguration(
             vo: null,
             logLevel: MPVLogLevel.error,
-            bufferSize: 32 * 1024 * 1024, // 32MB 缓冲
+            bufferSize: bufferMB * 1024 * 1024,
             ready: () {
               Log.i('LiveRoom', '播放器就绪回调触发');
             },
@@ -112,11 +116,11 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
 
         _subscriptions.add(player!.stream.playing.listen((playing) {
           isPlaying.value = playing;
-          // 后台被系统暂停时，不同步 PAUSE 到 AVSession，尝试恢复播放
-          if (_isInBackground && !playing && _wasPlayingBeforeBackground) {
+          // 暂停模式下不尝试后台恢复
+          if (_isInBackground && !playing && _wasPlayingBeforeBackground && _bgPlayMode != 2) {
             if (_bgResumeRetryCount < _maxBgResumeRetry) {
               _bgResumeRetryCount++;
-              Log.i('LiveRoom', '后台播放被暂停，尝试恢复(${_bgResumeRetryCount}/$_maxBgResumeRetry)...');
+              Log.i('LiveRoom', '后台播放被暂停，尝试恢复($_bgResumeRetryCount/$_maxBgResumeRetry)...');
               Future.delayed(const Duration(milliseconds: 500), () {
                 if (!_isDisposing && _isInBackground && player != null && !isPlaying.value) {
                   player!.play();
@@ -156,6 +160,7 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
     _lifecycleChannel.setMethodCallHandler(null);
     WidgetsBinding.instance.removeObserver(this);
     _hideControlsTimer?.cancel();
+    _autoExitTimer?.cancel();
     _danmakuReconnectTimer?.cancel();
     for (final sub in _subscriptions) {
       sub.cancel();
@@ -178,17 +183,15 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
     try {
       final nativePlayer = player!.platform;
       if (nativePlayer is NativePlayer) {
-        // 硬件解码：优先使用硬解，失败自动回退软解
-        nativePlayer.setProperty('hwdec', 'auto-safe');
-        // 视频同步：适合直播的低延迟同步
+        final hwDecode = StorageService.instance.getValue<bool>('hardware_decode', true);
+        nativePlayer.setProperty('hwdec', hwDecode ? 'auto-safe' : 'no');
         nativePlayer.setProperty('video-sync', 'audio');
-        // 直播流缓存策略
         nativePlayer.setProperty('cache', 'yes');
         nativePlayer.setProperty('cache-secs', '2');
-        // 降低直播延迟：减少探测数据量和分析时长，加快首帧
         nativePlayer.setProperty('demuxer-lavf-o',
             'fflags=+nobuffer,probesize=32768,analyzeduration=500000');
-        Log.i('LiveRoom', 'mpv 参数配置完成');
+        final bufferMB = StorageService.instance.getValue<int>('buffer_size', 32);
+        Log.i('LiveRoom', 'mpv: hwdec=$hwDecode, buffer=${bufferMB}MB');
       }
     } catch (e) {
       Log.w('LiveRoom', 'mpv 参数配置失败: $e');
@@ -239,6 +242,14 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
         _loadQualities(roomDetail),
         _startDanmaku(roomDetail),
       ]);
+
+      // 自动全屏
+      if (StorageService.instance.getValue<bool>('auto_fullscreen', false)) {
+        Future.microtask(() => toggleFullscreen());
+      }
+
+      // 定时关闭
+      _startAutoExitTimer();
     } catch (e, stack) {
       Log.e('LiveRoom', '加载房间失败', e, stack);
       errorMsg.value = '加载失败: $e';
@@ -484,6 +495,16 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
     await _loadRoom();
   }
 
+  void _startAutoExitTimer() {
+    _autoExitTimer?.cancel();
+    final minutes = StorageService.instance.getValue<int>('auto_exit_minutes', 0);
+    if (minutes <= 0) return;
+    _autoExitTimer = Timer(Duration(minutes: minutes), () {
+      Log.i('LiveRoom', '定时关闭触发 ($minutes 分钟)');
+      Get.back();
+    });
+  }
+
   /// 刷新当前流（不重新加载房间详情，只重新拉取播放地址）
   final isRefreshingStream = false.obs;
 
@@ -537,23 +558,30 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  /// 后台播放模式：0=继续播放, 1=静音保持连接, 2=暂停
+  int get _bgPlayMode => StorageService.instance.getValue<int>('bg_play_mode', 1);
+
   void _onEnterBackground() {
     if (_isInBackground) return;
     _isInBackground = true;
     _backgroundEntryTime = DateTime.now();
     _wasPlayingBeforeBackground = isPlaying.value;
     _bgResumeRetryCount = 0;
-    Log.i('LiveRoom', '进入后台, wasPlaying=$_wasPlayingBeforeBackground');
-    // 后台静音：保持流连接存活但不播放声音
-    _setMute(true);
+    final mode = _bgPlayMode;
+    Log.i('LiveRoom', '进入后台, wasPlaying=$_wasPlayingBeforeBackground, mode=$mode');
+    switch (mode) {
+      case 0: break; // 继续播放，不做任何处理
+      case 2: player?.pause(); break; // 暂停
+      default: _setMute(true); break; // 静音保持连接
+    }
   }
 
   void _onEnterForeground() {
     if (!_isInBackground) return;
     _isInBackground = false;
     _bgResumeRetryCount = 0;
-    // 恢复声音
-    _setMute(false);
+    final mode = _bgPlayMode;
+    if (mode == 1) _setMute(false);
     final bgDuration = _backgroundEntryTime != null
         ? DateTime.now().difference(_backgroundEntryTime!)
         : Duration.zero;
@@ -562,11 +590,16 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
 
     if (!_wasPlayingBeforeBackground || !playerAvailable.value) return;
 
-    if (stillPlaying) {
-      // 音频仍在播放 → 流连接存活，只需刷新视频渲染管线
+    if (mode == 2) {
+      // 暂停模式：恢复播放或重连
+      if (bgDuration.inSeconds >= _bgRefreshThresholdSeconds) {
+        _reconnectStream();
+      } else {
+        player?.play();
+      }
+    } else if (stillPlaying) {
       _recoverVideoOnly();
     } else if (bgDuration.inSeconds >= _bgRefreshThresholdSeconds) {
-      // 音频已停止 + 后台时间较长 → 流可能已断，直接重连
       _reconnectStream();
     }
   }
