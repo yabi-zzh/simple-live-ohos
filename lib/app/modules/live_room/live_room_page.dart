@@ -300,24 +300,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               ),
             ),
           ),
-          // 封面占位层：首帧渲染前显示封面图，出画面后淡出
+          // 封面占位层：首帧渲染前显示封面图，出画面后立即隐藏
           Obx(() {
             final cover = _controller.detail.value?.cover;
-            final playing = _controller.isPlaying.value;
-            if (cover == null || cover.isEmpty) return const SizedBox.shrink();
-            return AnimatedOpacity(
-              opacity: playing ? 0.0 : 1.0,
-              duration: const Duration(milliseconds: 300),
-              child: IgnorePointer(
-                ignoring: playing,
-                child: GestureDetector(
-                  onTap: _controller.toggleControls,
-                  child: Container(
-                    color: Colors.black,
-                    child: Center(
-                      child: NetImage(cover, fit: BoxFit.contain),
-                    ),
-                  ),
+            final hasFrame = _controller.hasVideoFrame.value;
+            if (hasFrame || cover == null || cover.isEmpty) return const SizedBox.shrink();
+            return GestureDetector(
+              onTap: _controller.toggleControls,
+              child: Container(
+                color: Colors.black,
+                child: Center(
+                  child: NetImage(cover, fit: BoxFit.contain),
                 ),
               ),
             );
@@ -352,9 +345,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           Obx(() {
             final switching = _controller.isSwitching.value;
             final buffering = _controller.isBuffering.value;
-            final playing = _controller.isPlaying.value;
-            // 播放器已在播放时，不显示缓冲转圈（mpv 的 buffering 事件与首帧渲染不严格同步）
-            if (!switching && (!buffering || playing)) return const SizedBox.shrink();
+            final hasFrame = _controller.hasVideoFrame.value;
+            // 首帧未渲染前或缓冲中显示转圈，首帧已渲染且非缓冲时隐藏
+            final showLoading = switching || (!hasFrame && _controller.isPlaying.value) || (buffering && !hasFrame);
+            if (!showLoading) return const SizedBox.shrink();
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,

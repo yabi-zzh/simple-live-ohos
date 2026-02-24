@@ -38,6 +38,7 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
   final isPlaying = false.obs;
   final isBuffering = true.obs;
   final playerAvailable = false.obs;
+  final hasVideoFrame = false.obs;
 
   // 清晰度
   final qualities = <LivePlayQuality>[].obs;
@@ -112,6 +113,14 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
 
         videoController = VideoController(player!);
         Log.i('LiveRoom', 'VideoController 创建成功');
+        // 监听首帧渲染：rect 从 null 变为有效尺寸时表示视频已出画面
+        void onRect() {
+          final r = videoController!.rect.value;
+          if (r != null && r.width > 0 && r.height > 0) {
+            hasVideoFrame.value = true;
+          }
+        }
+        videoController!.rect.addListener(onRect);
         playerAvailable.value = true;
 
         _subscriptions.add(player!.stream.playing.listen((playing) {
@@ -333,6 +342,7 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
       Log.w('LiveRoom', '播放器不可用，无法播放');
       return;
     }
+    hasVideoFrame.value = false;
     Log.d('LiveRoom', '播放: $url');
     Log.d('LiveRoom', '请求头: $headers');
     try {
@@ -632,7 +642,7 @@ class LiveRoomController extends GetxController with WidgetsBindingObserver {
       if (nativePlayer is NativePlayer) {
         Log.i('LiveRoom', '快速路径: 流存活，刷新 VO (vid=no/auto)');
         nativePlayer.setProperty('vid', 'no');
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(const Duration(milliseconds: 16));
         if (_isDisposing || _isInBackground) return;
         nativePlayer.setProperty('vid', 'auto');
         Log.i('LiveRoom', 'VO 刷新完成');
